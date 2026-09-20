@@ -10,16 +10,25 @@ import httpx
 from bs4 import BeautifulSoup
 from rapidfuzz.fuzz import WRatio
 
-from config import SOURCES, ADAPTERS, USER_AGENT, REQUEST_TIMEOUT, MAX_SEARCH_RESULTS_PER_SOURCE, MAX_CONCURRENT_REQUESTS
+from config import (
+    SOURCES,
+    ADAPTERS,
+    USER_AGENT,
+    REQUEST_TIMEOUT,
+    MAX_SEARCH_RESULTS_PER_SOURCE,
+    MAX_CONCURRENT_REQUESTS,
+)
 
 PERSIAN_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
 MIN_MATCH_SCORE = 68.0
+
 
 def normalize_text(value: str) -> str:
     value = (value or "").translate(PERSIAN_DIGITS)
     value = value.replace("ي", "ی").replace("ى", "ی").replace("ك", "ک")
     value = re.sub(r"[\u200c\u200f\u202a-\u202e]", " ", value)
     return re.sub(r"\s+", " ", value).strip().lower()
+
 
 def relevance_score(query: str, title: str) -> float:
     q = normalize_text(query)
@@ -36,6 +45,7 @@ def relevance_score(query: str, title: str) -> float:
             return 92.0
     return round(WRatio(q, t), 1)
 
+
 def is_relevant(query: str, title: str) -> bool:
     q = normalize_text(query)
     t = normalize_text(title)
@@ -50,11 +60,13 @@ def is_relevant(query: str, title: str) -> bool:
     coverage = covered / len(tokens)
     return coverage >= 0.60 and WRatio(q, t) >= 55
 
+
 def money_to_int(value: str | None) -> int | None:
     if not value:
         return None
     digits = re.sub(r"[^0-9]", "", value.translate(PERSIAN_DIGITS))
     return int(digits) if digits else None
+
 
 def detect_price(soup: BeautifulSoup, text: str):
     for script in soup.select('script[type="application/ld+json"]'):
@@ -78,13 +90,32 @@ def detect_price(soup: BeautifulSoup, text: str):
     for pattern in patterns:
         m = re.search(pattern, text, re.I)
         if m:
-            return money_to_int(m.group(1)), ("تومان" if "تومان" in m.group(0) or "تومن" in m.group(0) else "ریال")
+            return money_to_int(m.group(1)), (
+                "تومان"
+                if "تومان" in m.group(0) or "تومن" in m.group(0)
+                else "ریال"
+            )
     return None, None
+
 
 def detect_stock(text: str):
     t = normalize_text(text)
-    negative = ["در انبار موجود نمی باشد", "در انبار موجود نیست", "ناموجود", "اتمام موجودی", "sold out", "out of stock"]
-    positive = ["موجود در انبار", "در انبار موجود است", "موجود است", "افزودن به سبد خرید", "add to cart", "in stock"]
+    negative = [
+        "در انبار موجود نمی باشد",
+        "در انبار موجود نیست",
+        "ناموجود",
+        "اتمام موجودی",
+        "sold out",
+        "out of stock",
+    ]
+    positive = [
+        "موجود در انبار",
+        "در انبار موجود است",
+        "موجود است",
+        "افزودن به سبد خرید",
+        "add to cart",
+        "in stock",
+    ]
     for phrase in negative:
         if phrase in t:
             return False, phrase
@@ -93,14 +124,22 @@ def detect_stock(text: str):
             return True, phrase
     return None, "نامشخص"
 
+
 def extract_title(soup: BeautifulSoup) -> str:
-    for selector in ["h1.product_title", "h1.entry-title", "h1", 'meta[property="og:title"]', "title"]:
+    for selector in [
+        "h1.product_title",
+        "h1.entry-title",
+        "h1",
+        'meta[property="og:title"]',
+        "title",
+    ]:
         node = soup.select_one(selector)
         if node:
             value = node.get("content") if node.name == "meta" else node.get_text(" ", strip=True)
             if value:
                 return value.strip()
     return ""
+
 
 def extract_search_links(soup: BeautifulSoup, base_url: str, query: str):
     q = normalize_text(query)
@@ -124,10 +163,54 @@ def extract_search_links(soup: BeautifulSoup, base_url: str, query: str):
     candidates.sort(reverse=True)
     return [url for _, url in candidates[:MAX_SEARCH_RESULTS_PER_SOURCE]]
 
+
 async def fetch(client: httpx.AsyncClient, url: str):
-    response = await client.get(url, follow_redirects=True)
-    response.raise_for_status()
-    return response.text, response.status_code
+    browser_headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/140.0.0.0 Safari/537.36"
+        ),
+        "Accept": (
+            "text/html,application/xhtml+xml,application/xml;q=0.9,"
+            "image/avif,image/webp,*/*;q=0.8"
+        ),
+        "Accept-Language": "fa-IR,fa;q=0.9,en-US;q=0.7,en;q=0.5",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+        "Upgrade-Insecure-Requests": "1",
+    }
+
+    last_exc = None
+    for attempt in range(2):
+        try:
+            response = await client.get(
+                url,
+                follow_redirects=True,
+                headers=browser_headers if attempt else None,
+            )
+            if attempt == 0 and response.status_code in {403, 429, 500, 502, 503, 504}:
+                await asyncio.sleep(0.4)
+                continue
+            response.raise_for_status()
+            return response.text, response.status_code
+        except (httpx.ConnectTimeout, httpx.ReadTimeout) as exc:
+            last_exc = exc
+            if attempt == 0:
+                await asyncio.sleep(0.25)
+                continue
+            raise
+        except httpx.HTTPStatusError as exc:
+            last_exc = exc
+            if attempt == 0 and exc.response.status_code in {403, 429, 500, 502, 503, 504}:
+                await asyncio.sleep(0.4)
+                continue
+            raise
+
+    if last_exc:
+        raise last_exc
+    raise RuntimeError("HTTP fetch failed")
+
 
 async def search_source(client, source, query):
     try:
@@ -135,10 +218,15 @@ async def search_source(client, source, query):
         soup = BeautifulSoup(html, "lxml")
         links = extract_search_links(soup, source.base_url, query)
         if not links:
-            links = [urljoin(source.base_url, a["href"]).split("#")[0] for a in soup.select("a[href]") if "/product/" in a.get("href", "")]
+            links = [
+                urljoin(source.base_url, a["href"]).split("#")[0]
+                for a in soup.select("a[href]")
+                if "/product/" in a.get("href", "")
+            ]
         return list(dict.fromkeys(links))[:MAX_SEARCH_RESULTS_PER_SOURCE]
     except Exception:
         return []
+
 
 async def parse_product(client, source, url, query):
     try:
@@ -156,7 +244,12 @@ async def parse_product(client, source, url, query):
     price, currency = detect_price(soup, text)
     stock, evidence = detect_stock(text)
     description = ""
-    for selector in [".woocommerce-product-details__short-description", ".short-description", ".product-short-description", "meta[name='description']"]:
+    for selector in [
+        ".woocommerce-product-details__short-description",
+        ".short-description",
+        ".product-short-description",
+        "meta[name='description']",
+    ]:
         node = soup.select_one(selector)
         if node:
             description = node.get("content", "") if node.name == "meta" else node.get_text(" ", strip=True)
@@ -169,25 +262,45 @@ async def parse_product(client, source, url, query):
             brand = node.get_text(" ", strip=True)
             break
     return {
-        "source": source.name, "url": url, "title": title, "match_score": score,
-        "price": price, "currency": currency, "stock": stock, "stock_evidence": evidence,
-        "address": source.address, "phone": source.phone, "brand": brand,
-        "description": description[:1200], "http_status": status,
+        "source": source.name,
+        "url": url,
+        "title": title,
+        "match_score": score,
+        "price": price,
+        "currency": currency,
+        "stock": stock,
+        "stock_evidence": evidence,
+        "address": source.address,
+        "phone": source.phone,
+        "brand": brand,
+        "description": description[:1200],
+        "http_status": status,
         "checked_at": datetime.now(timezone.utc).isoformat(),
     }
+
 
 async def search_medicines_legacy(query: str) -> dict:
     query = query.strip()
     if not query:
         raise ValueError("نام دارو الزامی است.")
-    limits = httpx.Limits(max_connections=MAX_CONCURRENT_REQUESTS, max_keepalive_connections=MAX_CONCURRENT_REQUESTS)
+    limits = httpx.Limits(
+        max_connections=MAX_CONCURRENT_REQUESTS,
+        max_keepalive_connections=MAX_CONCURRENT_REQUESTS,
+    )
     headers = {"User-Agent": USER_AGENT, "Accept-Language": "fa-IR,fa;q=0.9,en;q=0.6"}
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT, headers=headers, limits=limits) as client:
         enabled = [s for s in SOURCES if s.enabled]
         source_links = await asyncio.gather(*(search_source(client, s, query) for s in enabled))
-        jobs = [parse_product(client, s, link, query) for s, links in zip(enabled, source_links) for link in links]
+        jobs = [
+            parse_product(client, s, link, query)
+            for s, links in zip(enabled, source_links)
+            for link in links
+        ]
         products = [p for p in await asyncio.gather(*jobs) if p]
-    products.sort(key=lambda x: (x["stock"] is True, x["price"] is not None, x["match_score"]), reverse=True)
+    products.sort(
+        key=lambda x: (x["stock"] is True, x["price"] is not None, x["match_score"]),
+        reverse=True,
+    )
     return {
         "query": query,
         "checked_at": datetime.now(timezone.utc).isoformat(),
@@ -195,6 +308,7 @@ async def search_medicines_legacy(query: str) -> dict:
         "results": products,
         "note": "قیمت و موجودی فقط در زمان بررسی صفحه منبع گزارش شده‌اند. برای داروهای نسخه‌ای، وجود صفحه فروش اینترنتی به معنی مجاز بودن فروش بدون نسخه نیست.",
     }
+
 
 async def search_adapter(client, adapter, query):
     try:
@@ -208,22 +322,24 @@ async def search_adapter(client, adapter, query):
                 page_html, page_status = await fetch(client, url)
                 product = adapter.parse_product(BeautifulSoup(page_html, "lxml"), url, query)
                 if product:
-                    results.append({
-                        "source": adapter.name,
-                        "url": product.url,
-                        "title": product.title,
-                        "match_score": relevance_score(query, product.title),
-                        "price": product.price,
-                        "currency": product.currency,
-                        "stock": product.stock,
-                        "stock_evidence": product.stock_evidence,
-                        "address": adapter.address,
-                        "phone": adapter.phone,
-                        "brand": product.brand,
-                        "description": product.description,
-                        "http_status": page_status,
-                        "checked_at": datetime.now(timezone.utc).isoformat(),
-                    })
+                    results.append(
+                        {
+                            "source": adapter.name,
+                            "url": product.url,
+                            "title": product.title,
+                            "match_score": relevance_score(query, product.title),
+                            "price": product.price,
+                            "currency": product.currency,
+                            "stock": product.stock,
+                            "stock_evidence": product.stock_evidence,
+                            "address": adapter.address,
+                            "phone": adapter.phone,
+                            "brand": product.brand,
+                            "description": product.description,
+                            "http_status": page_status,
+                            "checked_at": datetime.now(timezone.utc).isoformat(),
+                        }
+                    )
             except Exception:
                 failed_pages += 1
         return results, {
@@ -246,17 +362,24 @@ async def search_adapter(client, adapter, query):
             "error": f"{type(exc).__name__}: {str(exc) or 'no message'}"[:300],
         }
 
+
 async def search_medicines(query: str) -> dict:
     query = query.strip()
     if not query:
         raise ValueError("نام دارو الزامی است.")
-    limits = httpx.Limits(max_connections=MAX_CONCURRENT_REQUESTS, max_keepalive_connections=MAX_CONCURRENT_REQUESTS)
+    limits = httpx.Limits(
+        max_connections=MAX_CONCURRENT_REQUESTS,
+        max_keepalive_connections=MAX_CONCURRENT_REQUESTS,
+    )
     headers = {"User-Agent": USER_AGENT, "Accept-Language": "fa-IR,fa;q=0.9,en;q=0.6"}
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT, headers=headers, limits=limits) as client:
         batches = await asyncio.gather(*(search_adapter(client, adapter, query) for adapter in ADAPTERS))
     products = [item for batch, _status in batches for item in batch]
     source_status = [status for _batch, status in batches]
-    products.sort(key=lambda x: (x["stock"] is True, x["price"] is not None, x["match_score"]), reverse=True)
+    products.sort(
+        key=lambda x: (x["stock"] is True, x["price"] is not None, x["match_score"]),
+        reverse=True,
+    )
     return {
         "query": query,
         "checked_at": datetime.now(timezone.utc).isoformat(),
