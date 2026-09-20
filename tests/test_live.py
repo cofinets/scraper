@@ -10,6 +10,7 @@ from config import ADAPTERS, REQUEST_TIMEOUT, USER_AGENT
 from scraper import MIN_MATCH_SCORE, fetch, search_medicines
 
 QUERY = "مگنیفورت"
+SMOKE_QUERIES = ["مگنیفورت", "متفورمین ۵۰۰", "گارداسیل ۹"]
 KNOWN_PRODUCT_URL = "https://darukala.ir/arian-salamat-magniforte"
 KNOWN_PRODUCT_QUERY = "کپسول مگنیفورت آرین سلامت سینا"
 REPORT_PATH = Path("live_report.json")
@@ -33,6 +34,7 @@ def diagnostic_anchors(soup, base_url):
 def test_live_medicine_search_and_product_parse():
     async def run():
         result = await search_medicines(QUERY)
+        smoke_results = {query: await search_medicines(query) for query in SMOKE_QUERIES}
         adapter = next(a for a in ADAPTERS if a.name == "داروکالا")
         headers = {
             "User-Agent": USER_AGENT,
@@ -98,6 +100,7 @@ def test_live_medicine_search_and_product_parse():
         "sources": result["source_status"],
         "results": result["results"],
         "search_diagnostics": diagnostics,
+        "smoke_queries": smoke_results,
         "known_product_test": {
             "query": KNOWN_PRODUCT_QUERY,
             "url": KNOWN_PRODUCT_URL,
