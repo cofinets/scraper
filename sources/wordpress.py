@@ -43,7 +43,7 @@ class WordPressAdapter(BaseAdapter):
         )
 
     def search_links(self, soup, query):
-        from scraper import is_relevant, relevance_score
+        from scraper import is_relevant, normalize_text, relevance_score
 
         ranked = []
         seen = set()
@@ -66,9 +66,6 @@ class WordPressAdapter(BaseAdapter):
                 sum(x in href_text for x in query_tokens) / len(query_tokens) >= 0.6
             )
 
-            # اولویت با عنوان محصول است؛ اگر متن لینک ضعیف باشد، slug آدرس
-            # محصول نیز بررسی می‌شود. این مورد برای نتایجی که عنوان لینک کوتاه
-            # یا تصویر است مهم است.
             if is_relevant(query, title):
                 seen.add(url)
                 ranked.append((score, url))
@@ -91,7 +88,7 @@ class WordPressAdapter(BaseAdapter):
 
         text = soup.get_text(" ", strip=True)
         price, currency = detect_price(soup, text)
-        stock, evidence = detect_stock(text)
+        stock, evidence = detect_stock(text, soup)
 
         brand = ""
         for selector in (".brand", ".product-brand", "[itemprop='brand']"):
