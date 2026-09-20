@@ -21,7 +21,7 @@ SOURCES = [
 
 ADAPTERS = [
     WordPressAdapter("مثبت سبز", "https://mosbatesabz.com", "تهران، ایران", ""),
-    WordPressAdapter("داروکالا", "https://darukala.ir", "تهرانپارس، تهران، ایران", "021-77703234"),
+    WordPressAdapter("داروکالا", "https://darukala.ir", "تهرانپارس، تهران، ایران", "021-77703234", "https://darukala.ir/index.php?route=product/search&search={query}"),
     WordPressAdapter("دارولاین", "https://darooline.com", "ایران", ""),
     MofidTebAdapter(),
     DaroohomeAdapter(),
