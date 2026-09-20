@@ -1,5 +1,5 @@
 from __future__ import annotations
-from urllib.parse import quote, urljoin
+from urllib.parse import quote, urljoin, urlparse
 from bs4 import BeautifulSoup
 from .base import BaseAdapter, ProductCandidate
 
@@ -14,8 +14,17 @@ class WordPressAdapter(BaseAdapter):
     def build_search_url(self, query):
         return self.search_template.format(query=quote(query))
 
+    def _looks_like_product_url(self, url):
+        path=urlparse(url).path.rstrip("/")
+        if not path:
+            return False
+        if path.startswith("/product/"):
+            return True
+        # Many Iranian WooCommerce stores use a root-level slug for products.
+        return path.count("/") == 1
+
     def search_links(self, soup, query):
-        from scraper import relevance_score, MIN_MATCH_SCORE, normalize_text
+        from scraper import relevance_score, MIN_MATCH_SCORE
         out=[]; seen=set()
         for a in soup.select("a[href]"):
             href=a.get("href","")
@@ -23,9 +32,11 @@ class WordPressAdapter(BaseAdapter):
             url=urljoin(self.base_url,href).split("#")[0]
             if not url.startswith(self.base_url) or url in seen:
                 continue
-            if any(x in url.lower() for x in ("/cart","/checkout","/my-account","/category/")):
+            if any(x in url.lower() for x in ("/cart","/checkout","/my-account","/category/","/tag/")):
                 continue
-            score=relevance_score(query, normalize_text(title))
+            if not self._looks_like_product_url(url):
+                continue
+            score=relevance_score(query,title)
             if score >= MIN_MATCH_SCORE:
                 seen.add(url); out.append((score,url))
         return [u for _,u in sorted(out,reverse=True)[:8]]
