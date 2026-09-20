@@ -1,0 +1,15 @@
+{
+  "name": "دارویاب | Iran Medicine Scraper",
+  "short_name": "دارویاب",
+  "description": "جست‌وجوی چندمنبعی اطلاعات دارو در ایران",
+  "lang": "fa",
+  "dir": "rtl",
+  "start_url": "/app/",
+  "scope": "/app/",
+  "display": "standalone",
+  "background_color": "#f4f7f8",
+  "theme_color": "#0f766e",
+  "icons": [
+    {"src": "/app/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}
+  ]
+}
