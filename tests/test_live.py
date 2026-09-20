@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 from config import ADAPTERS, REQUEST_TIMEOUT, USER_AGENT
 from scraper import MIN_MATCH_SCORE, fetch, search_medicines
 
-QUERY = "استامینوفن"
+QUERY = "مگنیفورت"
 KNOWN_PRODUCT_URL = "https://darukala.ir/arian-salamat-magniforte"
 KNOWN_PRODUCT_QUERY = "کپسول مگنیفورت آرین سلامت سینا"
 REPORT_PATH = Path("live_report.json")
