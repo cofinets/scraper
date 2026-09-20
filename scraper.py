@@ -36,6 +36,20 @@ def relevance_score(query: str, title: str) -> float:
             return 92.0
     return round(WRatio(q, t), 1)
 
+def is_relevant(query: str, title: str) -> bool:
+    q = normalize_text(query)
+    t = normalize_text(title)
+    if not q or not t:
+        return False
+    if q in t:
+        return True
+    tokens = [x for x in q.split() if len(x) >= 2]
+    if len(tokens) <= 1:
+        return WRatio(q, t) >= MIN_MATCH_SCORE
+    covered = sum(1 for token in tokens if token in t)
+    coverage = covered / len(tokens)
+    return coverage >= 0.60 and WRatio(q, t) >= 55
+
 def money_to_int(value: str | None) -> int | None:
     if not value:
         return None
@@ -104,7 +118,7 @@ def extract_search_links(soup: BeautifulSoup, base_url: str, query: str):
         anchor_text = a.get_text(" ", strip=True)
         combined = normalize_text(f"{anchor_text} {url}")
         score = relevance_score(q, combined)
-        if score >= MIN_MATCH_SCORE and url not in seen:
+        if is_relevant(query, combined) and url not in seen:
             seen.add(url)
             candidates.append((score, url))
     candidates.sort(reverse=True)
