@@ -27,7 +27,7 @@ let html='<table><tr><th>دارو</th><th>منبع</th><th>قیمت</th><th>مو
 for(const x of d.results){const stock=x.stock===true?'<span class="ok">موجود</span>':x.stock===false?'<span class="no">ناموجود</span>':'<span class="unknown">نامشخص</span>';
 const price=x.price==null?'—':new Intl.NumberFormat('fa-IR').format(x.price)+' '+(x.currency||'');
 html+=`<tr><td>${esc(x.title)}</td><td>${esc(x.source)}</td><td>${price}</td><td>${stock}</td><td>${esc(x.address||'')}</td><td><a href="${x.url}" target="_blank" rel="noopener">مشاهده</a></td></tr>`;}
-document.getElementById('out').innerHTML=html+'</table>'}
+html+='</table>'; if(d.grouped&&d.grouped.length){html+='<h2>تجمیع نتایج مشابه</h2>'; for(const g of d.grouped){html+='<div style="margin:14px 0;padding:14px;border:1px solid #e8ecf2;border-radius:12px"><b>'+esc(g.name)+'</b> — '+g.available_sources+' منبع دارای موجودی از '+g.sources+' منبع<br>'; for(const x of g.offers){html+='<div>'+esc(x.source)+' | '+(x.stock===true?'موجود':'نامشخص/ناموجود')+' | '+(x.price==null?'—':new Intl.NumberFormat('fa-IR').format(x.price))+' | <a href="'+x.url+'" target="_blank" rel="noopener">منبع</a></div>'; } html+='</div>';}} document.getElementById('out').innerHTML=html}
 function esc(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
 </script></body></html>"""
 
