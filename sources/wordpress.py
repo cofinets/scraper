@@ -60,15 +60,21 @@ class WordPressAdapter(BaseAdapter):
                 continue
 
             score = relevance_score(query, title)
-            if score < 68:
-                continue
+            href_text = normalize_text(url)
+            query_tokens = [x for x in normalize_text(query).split() if len(x) >= 2]
+            href_match = bool(query_tokens) and (
+                sum(x in href_text for x in query_tokens) / len(query_tokens) >= 0.6
+            )
 
-            # Prefer links whose visible title matches the medicine. This also
-            # handles stores whose product URLs do not follow WooCommerce's
-            # usual /product/ or single-slug conventions.
+            # اولویت با عنوان محصول است؛ اگر متن لینک ضعیف باشد، slug آدرس
+            # محصول نیز بررسی می‌شود. این مورد برای نتایجی که عنوان لینک کوتاه
+            # یا تصویر است مهم است.
             if is_relevant(query, title):
                 seen.add(url)
                 ranked.append((score, url))
+            elif href_match and score >= 45:
+                seen.add(url)
+                ranked.append((max(score, 70), url))
             elif self._looks_like_product_url(url) and score >= 78:
                 seen.add(url)
                 ranked.append((score, url))
