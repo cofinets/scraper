@@ -1,15 +1,21 @@
 import asyncio
+import json
 
-import pytest
-
-from config import ADAPTERS, REQUEST_TIMEOUT, USER_AGENT
+from config import ADAPTERS
 from scraper import search_medicines
 
-@pytest.mark.integration
 def test_live_medicine_search():
     result = asyncio.run(search_medicines("استامینوفن"))
+    print(json.dumps({
+        "query": result["query"],
+        "result_count": result["result_count"],
+        "sources": result["source_status"],
+        "sample_results": result["results"][:5],
+    }, ensure_ascii=False, indent=2))
     assert result["query"] == "استامینوفن"
     assert len(result["sources_checked"]) == len(ADAPTERS)
     assert len(result["source_status"]) == len(ADAPTERS)
-    assert all("status" in item and "source" in item for item in result["source_status"])
-    assert result["result_count"] >= 0
+
+    reachable = [s for s in result["source_status"] if s["status"] in {"ok", "partial"}]
+    assert reachable, f"No live source was reachable: {result['source_status']}"
+    assert result["result_count"] > 0, f"Live search returned no products: {result['source_status']}"
