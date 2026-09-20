@@ -13,11 +13,28 @@ from rapidfuzz.fuzz import WRatio
 from config import SOURCES, ADAPTERS, USER_AGENT, REQUEST_TIMEOUT, MAX_SEARCH_RESULTS_PER_SOURCE, MAX_CONCURRENT_REQUESTS
 
 PERSIAN_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
+MIN_MATCH_SCORE = 68.0
 
 def normalize_text(value: str) -> str:
     value = (value or "").translate(PERSIAN_DIGITS)
     value = value.replace("ي", "ی").replace("ى", "ی").replace("ك", "ک")
+    value = re.sub(r"[\u200c\u200f\u202a-\u202e]", " ", value)
     return re.sub(r"\s+", " ", value).strip().lower()
+
+def relevance_score(query: str, title: str) -> float:
+    q = normalize_text(query)
+    t = normalize_text(title)
+    if not q or not t:
+        return 0.0
+    if q in t:
+        return 100.0
+    q_tokens = [x for x in q.split() if len(x) >= 2]
+    if q_tokens:
+        covered = sum(1 for token in q_tokens if token in t)
+        coverage = covered / len(q_tokens)
+        if coverage == 1.0:
+            return 92.0
+    return round(WRatio(q, t), 1)
 
 def money_to_int(value: str | None) -> int | None:
     if not value:
@@ -84,11 +101,10 @@ def extract_search_links(soup: BeautifulSoup, base_url: str, query: str):
             continue
         if any(x in url.lower() for x in ["/cart", "/checkout", "/my-account", "/category/"]):
             continue
-        combined = normalize_text(f"{a.get_text(' ', strip=True)} {url}")
-        score = WRatio(q, combined)
-        if q in combined:
-            score += 25
-        if score >= 45 and url not in seen:
+        anchor_text = a.get_text(" ", strip=True)
+        combined = normalize_text(f"{anchor_text} {url}")
+        score = relevance_score(q, combined)
+        if score >= MIN_MATCH_SCORE and url not in seen:
             seen.add(url)
             candidates.append((score, url))
     candidates.sort(reverse=True)
@@ -119,8 +135,8 @@ async def parse_product(client, source, url, query):
     title = extract_title(soup)
     if not title:
         return None
-    score = round(WRatio(normalize_text(query), normalize_text(title)), 1)
-    if score < 45:
+    score = relevance_score(query, title)
+    if score < MIN_MATCH_SCORE:
         return None
     text = soup.get_text(" ", strip=True)
     price, currency = detect_price(soup, text)
@@ -182,7 +198,7 @@ async def search_adapter(client, adapter, query):
                         "source": adapter.name,
                         "url": product.url,
                         "title": product.title,
-                        "match_score": round(WRatio(normalize_text(query), normalize_text(product.title)), 1),
+                        "match_score": relevance_score(query, product.title),
                         "price": product.price,
                         "currency": product.currency,
                         "stock": product.stock,
@@ -213,7 +229,7 @@ async def search_adapter(client, adapter, query):
             "search_links": 0,
             "parsed_products": 0,
             "failed_pages": 0,
-            "error": str(exc)[:300],
+            "error": f"{type(exc).__name__}: {str(exc) or 'no message'}"[:300],
         }
 
 async def search_medicines(query: str) -> dict:
