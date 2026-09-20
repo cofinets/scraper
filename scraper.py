@@ -168,7 +168,7 @@ async def search_medicines_legacy(query: str) -> dict:
 
 async def search_adapter(client, adapter, query):
     try:
-        html, _ = await fetch(client, adapter.build_search_url(query))
+        html, search_status = await fetch(client, adapter.build_search_url(query))
         soup = BeautifulSoup(html, "lxml")
         links = adapter.search_links(soup, query)
         results = []
@@ -199,7 +199,9 @@ async def search_adapter(client, adapter, query):
         return results, {
             "source": adapter.name,
             "status": "ok" if failed_pages == 0 else "partial",
+            "search_http_status": search_status,
             "search_links": len(links),
+            "parsed_products": len(results),
             "failed_pages": failed_pages,
             "error": None,
         }
@@ -207,7 +209,9 @@ async def search_adapter(client, adapter, query):
         return [], {
             "source": adapter.name,
             "status": "error",
+            "search_http_status": None,
             "search_links": 0,
+            "parsed_products": 0,
             "failed_pages": 0,
             "error": str(exc)[:300],
         }
