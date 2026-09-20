@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="description" content="جست‌وجوی چندمنبعی اطلاعات دارو در ایران">
+  <link rel="manifest" href="/app/manifest.webmanifest">
+  <link rel="icon" href="/app/icons/icon.svg" type="image/svg+xml">
+  <title>دارویاب | جست‌وجوی دارو</title>
+  <link rel="stylesheet" href="/app/styles.css">
+</head>
+<body>
+  <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">✚</div>
+      <div><strong>دارویاب</strong><span>Medicine Intelligence</span></div>
+    </div>
+    <div class="top-actions">
+      <button id="installBtn" class="ghost hidden">نصب برنامه</button>
+      <button id="refreshBtn" class="icon-btn" title="پاک کردن جستجوی فعلی">↻</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <div class="eyebrow">جست‌وجوی چندمنبعی</div>
+      <h1>اطلاعات دارو را <span>یک‌جا</span> ببینید.</h1>
+      <p>نام دارو را وارد کنید تا منابع بررسی شوند و قیمت، موجودی آنلاین، مشخصات و لینک مستقیم هر نتیجه را در یک داشبورد فارسی و مرتب ببینید.</p>
+      <form id="searchForm" class="search-box">
+        <div class="search-icon">⌕</div>
+        <input id="query" autocomplete="off" maxlength="120" placeholder="مثلاً: گارداسیل ۹، مگنیفورت، متفورمین ۵۰۰" aria-label="نام دارو">
+        <button type="button" id="clearBtn" class="clear-btn hidden">×</button>
+        <button type="submit" class="search-btn">جستجو <span>←</span></button>
+      </form>
+      <div class="chips">
+        <button data-q="گارداسیل ۹">گارداسیل ۹</button>
+        <button data-q="مگنیفورت">مگنیفورت</button>
+        <button data-q="متفورمین ۵۰۰">متفورمین ۵۰۰</button>
+        <button data-q="آموکسی سیلین">آموکسی‌سیلین</button>
+      </div>
+      <div class="privacy-note">اطلاعات قیمت و موجودی از صفحات عمومی منابع در زمان جستجو خوانده می‌شود؛ موجودی آنلاین لزوماً موجودی فیزیکی نیست.</div>
+    </section>
+
+    <section id="loading" class="loading card hidden">
+      <div class="spinner"></div>
+      <div><strong>در حال بررسی منابع...</strong><p>ممکن است بعضی سایت‌ها کند یا موقتاً در دسترس نباشند.</p></div>
+    </section>
+
+    <section id="summary" class="hidden">
+      <div class="result-head">
+        <div><div class="eyebrow">نتیجه جستجو</div><h2 id="resultTitle">—</h2><span id="checkedAt" class="muted"></span></div>
+        <div class="result-actions">
+          <button id="copyBtn" class="secondary">کپی JSON</button>
+          <button id="exportBtn" class="secondary">ذخیره JSON</button>
+          <button id="newSearchBtn" class="primary">جستجوی جدید</button>
+        </div>
+      </div>
+      <div id="stats" class="stats"></div>
+      <div id="sourceStatus" class="source-grid"></div>
+
+      <div class="toolbar card">
+        <div class="field"><label for="filter">فیلتر نتایج</label><select id="filter">
+          <option value="all">همه نتایج</option><option value="available">فقط موجود</option><option value="unavailable">فقط ناموجود</option><option value="unknown">موجودی نامشخص</option>
+        </select></div>
+        <div class="field"><label for="sort">مرتب‌سازی</label><select id="sort">
+          <option value="relevance">بیشترین تطابق</option><option value="price">کمترین قیمت</option><option value="stock">موجودها اول</option><option value="source">نام منبع</option>
+        </select></div>
+        <div class="result-count"><span id="visibleCount">۰</span> نتیجه</div>
+      </div>
+
+      <div id="results" class="results"></div>
+      <div id="groupedSection" class="grouped"></div>
+      <div id="note" class="note"></div>
+    </section>
+
+    <section id="empty" class="empty card hidden">
+      <div class="empty-icon">⌕</div><h3>نتیجه‌ای پیدا نشد</h3>
+      <p id="emptyText">عبارت دیگری را امتحان کنید.</p>
+    </section>
+
+    <section id="welcome" class="features">
+      <article><div>⚡</div><h3>جستجوی هم‌زمان</h3><p>منابع به صورت مستقل بررسی می‌شوند تا خطای یک سایت کل جستجو را متوقف نکند.</p></article>
+      <article><div>◈</div><h3>اطلاعات ساختاریافته</h3><p>نام، برند، قیمت، موجودی، امتیاز تطابق، آدرس، تلفن و لینک مستقیم.</p></article>
+      <article><div>▦</div><h3>PWA و فارسی</h3><p>رابط RTL، واکنش‌گرا، قابل نصب و مناسب موبایل و دسکتاپ.</p></article>
+    </section>
+  </main>
+
+  <footer>Iran Medicine Scraper · نسخه 1.1 · داده‌ها هنگام جستجو از منابع عمومی خوانده می‌شوند.</footer>
+
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop"></div><div class="modal-card">
+      <button id="closeModal" class="modal-close">×</button><div id="modalBody"></div>
+    </div>
+  </div>
+  <div id="toast" class="toast"></div>
+  <script src="/app/app.js"></script>
+</body>
+</html>
