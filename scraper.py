@@ -10,7 +10,7 @@ import httpx
 from bs4 import BeautifulSoup
 from rapidfuzz.fuzz import WRatio
 
-from config import SOURCES, USER_AGENT, REQUEST_TIMEOUT, MAX_SEARCH_RESULTS_PER_SOURCE, MAX_CONCURRENT_REQUESTS
+from config import SOURCES, ADAPTERS, USER_AGENT, REQUEST_TIMEOUT, MAX_SEARCH_RESULTS_PER_SOURCE, MAX_CONCURRENT_REQUESTS
 
 PERSIAN_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
 
@@ -146,7 +146,7 @@ async def parse_product(client, source, url, query):
         "checked_at": datetime.now(timezone.utc).isoformat(),
     }
 
-async def search_medicines(query: str) -> dict:
+async def search_medicines_legacy(query: str) -> dict:
     query = query.strip()
     if not query:
         raise ValueError("نام دارو الزامی است.")
@@ -164,4 +164,56 @@ async def search_medicines(query: str) -> dict:
         "result_count": len(products),
         "results": products,
         "note": "قیمت و موجودی فقط در زمان بررسی صفحه منبع گزارش شده‌اند. برای داروهای نسخه‌ای، وجود صفحه فروش اینترنتی به معنی مجاز بودن فروش بدون نسخه نیست.",
+    }
+
+async def search_adapter(client, adapter, query):
+    try:
+        html, _ = await fetch(client, adapter.build_search_url(query))
+        soup = BeautifulSoup(html, "lxml")
+        links = adapter.search_links(soup, query)
+        results = []
+        for url in links:
+            try:
+                page_html, page_status = await fetch(client, url)
+                product = adapter.parse_product(BeautifulSoup(page_html, "lxml"), url, query)
+                if product:
+                    results.append({
+                        "source": adapter.name,
+                        "url": product.url,
+                        "title": product.title,
+                        "match_score": round(WRatio(normalize_text(query), normalize_text(product.title)), 1),
+                        "price": product.price,
+                        "currency": product.currency,
+                        "stock": product.stock,
+                        "stock_evidence": product.stock_evidence,
+                        "address": adapter.address,
+                        "phone": adapter.phone,
+                        "brand": product.brand,
+                        "description": product.description,
+                        "http_status": page_status,
+                        "checked_at": datetime.now(timezone.utc).isoformat(),
+                    })
+            except Exception:
+                continue
+        return results
+    except Exception:
+        return []
+
+async def search_medicines(query: str) -> dict:
+    query = query.strip()
+    if not query:
+        raise ValueError("نام دارو الزامی است.")
+    limits = httpx.Limits(max_connections=MAX_CONCURRENT_REQUESTS, max_keepalive_connections=MAX_CONCURRENT_REQUESTS)
+    headers = {"User-Agent": USER_AGENT, "Accept-Language": "fa-IR,fa;q=0.9,en;q=0.6"}
+    async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT, headers=headers, limits=limits) as client:
+        batches = await asyncio.gather(*(search_adapter(client, adapter, query) for adapter in ADAPTERS))
+    products = [item for batch in batches for item in batch]
+    products.sort(key=lambda x: (x["stock"] is True, x["price"] is not None, x["match_score"]), reverse=True)
+    return {
+        "query": query,
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "result_count": len(products),
+        "sources_checked": [a.name for a in ADAPTERS],
+        "results": products,
+        "note": "قیمت و موجودی فقط در زمان بررسی صفحه منبع گزارش شده‌اند. موجودی آنلاین لزوماً موجودی فیزیکی لحظه‌ای نیست. برای داروهای نسخه‌ای، وجود صفحه فروش اینترنتی به معنی مجاز بودن فروش بدون نسخه نیست.",
     }
