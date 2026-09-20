@@ -17,7 +17,7 @@ PERSIAN_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "0123
 def normalize_text(value: str) -> str:
     value = (value or "").translate(PERSIAN_DIGITS)
     value = value.replace("ي", "ی").replace("ى", "ی").replace("ك", "ک")
-    return re.sub(r"\\s+", " ", value).strip().lower()
+    return re.sub(r"\s+", " ", value).strip().lower()
 
 def money_to_int(value: str | None) -> int | None:
     if not value:
