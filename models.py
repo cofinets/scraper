@@ -21,5 +21,6 @@ class MedicineSearchResponse(BaseModel):
     result_count: int
     sources_checked: list[str]
     results: list[MedicineResult]
+    source_status: list[dict] = []
     grouped: list[dict] = []
     note: str
