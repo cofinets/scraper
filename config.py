@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from sources.daroohome import DaroohomeAdapter
+from sources.wordpress import WordPressAdapter as WPAdapter
 from sources.mofidteb import MofidTebAdapter
 from sources.wordpress import WordPressAdapter
 
@@ -25,6 +26,9 @@ ADAPTERS = [
     WordPressAdapter("دارولاین", "https://darooline.com", "ایران", ""),
     MofidTebAdapter(),
     DaroohomeAdapter(),
+    # داروکده در حال حاضر به عنوان منبع آزمایشی اضافه شده؛ endpoint جست‌وجوی
+    # آن ممکن است با تغییر سایت عوض شود و وضعیتش در source_status مشخص می‌شود.
+    WPAdapter("داروکده", "https://www.darukade.com", "تهران، خیابان جمالزاده شمالی، پلاک 251", "021-62747000", "https://www.darukade.com/search?q={query}"),
 ]
 
 USER_AGENT = "IranMedicineScraper/1.1 (+https://github.com/cofinets/scraper)"
