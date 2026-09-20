@@ -84,14 +84,15 @@ def test_live_medicine_search_and_product_parse():
                     })
 
             html, status = await fetch(client, KNOWN_PRODUCT_URL)
+
         product = adapter.parse_product(
             BeautifulSoup(html, "lxml"),
             KNOWN_PRODUCT_URL,
             KNOWN_PRODUCT_QUERY,
         )
-        return result, status, product, diagnostics
+        return result, smoke_results, status, product, diagnostics
 
-    result, product_http_status, product, diagnostics = asyncio.run(run())
+    result, smoke_results, product_http_status, product, diagnostics = asyncio.run(run())
 
     report = {
         "query": result["query"],
