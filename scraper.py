@@ -102,8 +102,37 @@ def detect_price(soup: BeautifulSoup, text: str):
     return None, None
 
 
-def detect_stock(text: str):
+def detect_stock(text: str, soup: BeautifulSoup | None = None):
+    """تشخیص موجودی با اولویت schema.org و کنترل فعال/غیرفعال بودن خرید."""
     t = normalize_text(text)
+    if soup is not None:
+        for script in soup.select('script[type="application/ld+json"]'):
+            try:
+                data = json.loads(script.string or script.get_text())
+            except Exception:
+                continue
+            for obj in (data if isinstance(data, list) else [data]):
+                if not isinstance(obj, dict):
+                    continue
+                offers = obj.get("offers")
+                for offer in (offers if isinstance(offers, list) else [offers]):
+                    if not isinstance(offer, dict):
+                        continue
+                    availability = normalize_text(str(offer.get("availability", "")))
+                    if "outofstock" in availability or "soldout" in availability:
+                        return False, "schema.org: OutOfStock"
+                    if "instock" in availability or "limitedavailability" in availability:
+                        return True, "schema.org: InStock"
+
+        for node in soup.select("button, input[type='submit'], a"):
+            label = normalize_text(node.get_text(" ", strip=True) or node.get("value", ""))
+            classes = normalize_text(" ".join(node.get("class", [])))
+            disabled = node.has_attr("disabled") or "disabled" in classes or node.get("aria-disabled") == "true"
+            if any(x in label for x in ("افزودن به سبد خرید", "افزودن به سبد", "add to cart", "buy now")):
+                if disabled:
+                    return False, "دکمه خرید غیرفعال"
+                return True, "دکمه خرید فعال"
+
     negative = [
         "در انبار موجود نمی باشد",
         "در انبار موجود نیست",
@@ -246,7 +275,7 @@ async def parse_product(client, source, url, query):
         return None
     text = soup.get_text(" ", strip=True)
     price, currency = detect_price(soup, text)
-    stock, evidence = detect_stock(text)
+    stock, evidence = detect_stock(text, soup)
     description = ""
     for selector in [
         ".woocommerce-product-details__short-description",
