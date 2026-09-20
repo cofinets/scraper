@@ -16,3 +16,13 @@ def test_structured_price():
 def test_stock_detection():
     assert detect_stock("این محصول موجود در انبار است") [0] is True
     assert detect_stock("اتمام موجودی") [0] is False
+
+
+def test_stock_schema_in_stock():
+    html = '<script type="application/ld+json">{"@type":"Product","offers":{"availability":"https://schema.org/InStock"}}</script>'
+    assert detect_stock("", BeautifulSoup(html, "lxml")) == (True, "schema.org: InStock")
+
+
+def test_stock_disabled_cart():
+    html = '<button disabled>افزودن به سبد خرید</button>'
+    assert detect_stock("", BeautifulSoup(html, "lxml"))[0] is False
