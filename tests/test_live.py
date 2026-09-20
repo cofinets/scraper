@@ -58,6 +58,21 @@ def test_live_medicine_search_and_product_parse():
                         "page_title": soup.title.get_text(" ", strip=True)[:300] if soup.title else "",
                         "anchor_count": len(soup.select("a[href]")),
                         "sample_anchors": diagnostic_anchors(soup, source.base_url),
+                        "forms": [
+                            {
+                                "action": urljoin(str(response.url), form.get("action", "")),
+                                "method": form.get("method", "get").lower(),
+                                "inputs": [
+                                    {
+                                        "name": node.get("name", ""),
+                                        "type": node.get("type", ""),
+                                        "value": node.get("value", ""),
+                                    }
+                                    for node in form.select("input[name]")
+                                ][:12],
+                            }
+                            for form in soup.select("form")
+                        ][:10],
                     })
                 except Exception as exc:
                     diagnostics.append({
