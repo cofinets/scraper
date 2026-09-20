@@ -42,10 +42,10 @@ class WordPressAdapter(BaseAdapter):
         return [u for _,u in sorted(out,reverse=True)[:8]]
 
     def parse_product(self, soup, url, query):
-        from scraper import extract_title, detect_price, detect_stock, relevance_score, MIN_MATCH_SCORE
+        from scraper import extract_title, detect_price, detect_stock, relevance_score, is_relevant
         title=extract_title(soup)
         score=relevance_score(query,title)
-        if not title or score < MIN_MATCH_SCORE:
+        if not title or not is_relevant(query, title):
             return None
         text=soup.get_text(" ",strip=True)
         price,currency=detect_price(soup,text)
