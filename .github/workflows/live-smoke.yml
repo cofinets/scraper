@@ -17,4 +17,20 @@ jobs:
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -r requirements.txt
       - run: python -m pip install pytest
-      - run: python -m pytest -q tests/test_live.py
+      - name: Run live scraper test
+        run: python -m pytest -s -q tests/test_live.py
+      - name: Print live JSON report
+        if: always()
+        run: |
+          if [ -f live_report.json ]; then
+            cat live_report.json
+          else
+            echo "live_report.json was not generated"
+          fi
+      - name: Upload live report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-medicine-report
+          path: live_report.json
+          if-no-files-found: warn
