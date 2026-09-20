@@ -10,6 +10,7 @@ import httpx
 from bs4 import BeautifulSoup
 from rapidfuzz.fuzz import WRatio
 
+from aggregator import group_results
 from config import (
     SOURCES,
     ADAPTERS,
@@ -27,6 +28,9 @@ def normalize_text(value: str) -> str:
     value = (value or "").translate(PERSIAN_DIGITS)
     value = value.replace("ي", "ی").replace("ى", "ی").replace("ك", "ک")
     value = re.sub(r"[\u200c\u200f\u202a-\u202e]", " ", value)
+    # «گارداسیل9» و «گارداسیل ۹» را یکسان می‌کند.
+    value = re.sub(r"(?<=[^\W\d_])(?=\d)", " ", value, flags=re.UNICODE)
+    value = re.sub(r"(?<=\d)(?=[^\W\d_])", " ", value, flags=re.UNICODE)
     return re.sub(r"\s+", " ", value).strip().lower()
 
 
