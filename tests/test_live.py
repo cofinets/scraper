@@ -7,7 +7,7 @@ from scraper import MIN_MATCH_SCORE, search_medicines
 
 QUERIES = [
     "استامینوفن",
-    "قرص جویدنی ویتامین ث 250 مهر دارو",
+    "قرص نفروویت اسوه",
 ]
 REPORT_PATH = Path("live_report.json")
 
@@ -44,3 +44,4 @@ def test_live_medicine_search():
     # active source, so this verifies that the scraper can return real data,
     # not merely a reachable website.
     assert reports[1]["result_count"] > 0, reports[1]["sources"]
+    assert any("نفروویت" in item["title"] for item in reports[1]["results"])
