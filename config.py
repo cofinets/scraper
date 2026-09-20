@@ -1,5 +1,9 @@
 from dataclasses import dataclass
 
+from sources.daroohome import DaroohomeAdapter
+from sources.mofidteb import MofidTebAdapter
+from sources.wordpress import WordPressAdapter
+
 @dataclass(frozen=True)
 class Source:
     name: str
@@ -15,7 +19,15 @@ SOURCES = [
     Source("دارولاین", "https://darooline.com", "https://darooline.com/?s={query}", "ایران", ""),
 ]
 
-USER_AGENT = "IranMedicineScraper/1.0 (+https://github.com/cofinets/scraper)"
+ADAPTERS = [
+    WordPressAdapter("مثبت سبز", "https://mosbatesabz.com", "تهران، ایران", ""),
+    WordPressAdapter("داروکالا", "https://darukala.ir", "تهرانپارس، تهران، ایران", "021-77703234"),
+    WordPressAdapter("دارولاین", "https://darooline.com", "ایران", ""),
+    MofidTebAdapter(),
+    DaroohomeAdapter(),
+]
+
+USER_AGENT = "IranMedicineScraper/1.1 (+https://github.com/cofinets/scraper)"
 REQUEST_TIMEOUT = 20.0
 MAX_SEARCH_RESULTS_PER_SOURCE = 8
 MAX_CONCURRENT_REQUESTS = 6
