@@ -1,7 +1,6 @@
 from __future__ import annotations
 from urllib.parse import quote, urljoin
 from bs4 import BeautifulSoup
-from rapidfuzz.fuzz import WRatio
 from .base import BaseAdapter, ProductCandidate
 
 class WordPressAdapter(BaseAdapter):
@@ -16,7 +15,7 @@ class WordPressAdapter(BaseAdapter):
         return self.search_template.format(query=quote(query))
 
     def search_links(self, soup, query):
-        q=query.casefold().strip()
+        from scraper import relevance_score, MIN_MATCH_SCORE, normalize_text
         out=[]; seen=set()
         for a in soup.select("a[href]"):
             href=a.get("href","")
@@ -26,17 +25,16 @@ class WordPressAdapter(BaseAdapter):
                 continue
             if any(x in url.lower() for x in ("/cart","/checkout","/my-account","/category/")):
                 continue
-            text=(title+" "+url).casefold()
-            score=WRatio(q,text)
-            if q in text: score += 25
-            if score >= 45:
+            score=relevance_score(query, normalize_text(title))
+            if score >= MIN_MATCH_SCORE:
                 seen.add(url); out.append((score,url))
         return [u for _,u in sorted(out,reverse=True)[:8]]
 
     def parse_product(self, soup, url, query):
-        from scraper import extract_title, detect_price, detect_stock, normalize_text
+        from scraper import extract_title, detect_price, detect_stock, relevance_score, MIN_MATCH_SCORE
         title=extract_title(soup)
-        if not title or WRatio(normalize_text(query),normalize_text(title)) < 45:
+        score=relevance_score(query,title)
+        if not title or score < MIN_MATCH_SCORE:
             return None
         text=soup.get_text(" ",strip=True)
         price,currency=detect_price(soup,text)
