@@ -172,6 +172,7 @@ async def search_adapter(client, adapter, query):
         soup = BeautifulSoup(html, "lxml")
         links = adapter.search_links(soup, query)
         results = []
+        failed_pages = 0
         for url in links:
             try:
                 page_html, page_status = await fetch(client, url)
@@ -194,10 +195,22 @@ async def search_adapter(client, adapter, query):
                         "checked_at": datetime.now(timezone.utc).isoformat(),
                     })
             except Exception:
-                continue
-        return results
-    except Exception:
-        return []
+                failed_pages += 1
+        return results, {
+            "source": adapter.name,
+            "status": "ok" if failed_pages == 0 else "partial",
+            "search_links": len(links),
+            "failed_pages": failed_pages,
+            "error": None,
+        }
+    except Exception as exc:
+        return [], {
+            "source": adapter.name,
+            "status": "error",
+            "search_links": 0,
+            "failed_pages": 0,
+            "error": str(exc)[:300],
+        }
 
 async def search_medicines(query: str) -> dict:
     query = query.strip()
@@ -207,13 +220,15 @@ async def search_medicines(query: str) -> dict:
     headers = {"User-Agent": USER_AGENT, "Accept-Language": "fa-IR,fa;q=0.9,en;q=0.6"}
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT, headers=headers, limits=limits) as client:
         batches = await asyncio.gather(*(search_adapter(client, adapter, query) for adapter in ADAPTERS))
-    products = [item for batch in batches for item in batch]
+    products = [item for batch, _status in batches for item in batch]
+    source_status = [status for _batch, status in batches]
     products.sort(key=lambda x: (x["stock"] is True, x["price"] is not None, x["match_score"]), reverse=True)
     return {
         "query": query,
         "checked_at": datetime.now(timezone.utc).isoformat(),
         "result_count": len(products),
         "sources_checked": [a.name for a in ADAPTERS],
+        "source_status": source_status,
         "results": products,
         "note": "قیمت و موجودی فقط در زمان بررسی صفحه منبع گزارش شده‌اند. موجودی آنلاین لزوماً موجودی فیزیکی لحظه‌ای نیست. برای داروهای نسخه‌ای، وجود صفحه فروش اینترنتی به معنی مجاز بودن فروش بدون نسخه نیست.",
     }
